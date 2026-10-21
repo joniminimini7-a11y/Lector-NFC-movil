@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>Lector NFC</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface2: #1b2740;
+    --border: #26344f;
+    --text: #e2e8f0;
+    --muted: #8ea0bd;
+    --accent: #22d3ee;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header {
+    width: 100%;
+    padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px 16px;
+    text-align: center;
+  }
+  header .logo { width: 52px; height: 52px; }
+  header h1 { font-size: 1.15rem; font-weight: 800; margin-top: 8px; }
+  header p { color: var(--muted); font-size: .82rem; margin-top: 4px; }
+  main { width: 100%; max-width: 480px; padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 40px); }
+  #btnScan {
+    width: 100%;
+    padding: 26px;
+    margin-top: 10px;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #04121f;
+    background: linear-gradient(135deg, #22d3ee, #0891b2);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(34,211,238,.25);
+    transition: transform .1s;
+  }
+  #btnScan:active { transform: scale(.98); }
+  #btnScan svg { width: 30px; height: 30px; }
+  #btnScan:disabled { opacity: .6; }
+  .hint { text-align: center; color: var(--muted); font-size: .82rem; margin-top: 12px; line-height: 1.5; }
+  #status {
+    text-align: center;
+    font-size: .9rem;
+    font-weight: 600;
+    margin-top: 16px;
+    min-height: 24px;
+  }
+  #status.wait { color: var(--accent); }
+  #status.ok { color: #4ade80; }
+  #status.err { color: var(--danger); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 16px;
+    display: none;
+    animation: pop .25s ease;
+  }
+  .card.show { display: block; }
+  @keyframes pop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .card h2 { font-size: .8rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  #tagId {
+    font-size: 1.05rem;
+    font-weight: 800;
+    word-break: break-all;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  #tagContent { margin-top: 12px; }
+  .content-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-size: .92rem;
+    word-break: break-all;
+  }
+  .content-item .ctype { color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+  .content-item a { color: var(--accent); }
+  .row-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-weight: 700;
+    font-size: .88rem;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); color: #04121f; border: none; }
+  #installWrap { display: none; margin-top: 18px; text-align: center; }
+  #installWrap button {
+    padding: 12px 22px;
+    border-radius: 12px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: .9rem;
+    cursor: pointer;
+  }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 90px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: .88rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: all .25s;
+    max-width: 90vw;
+    text-align: center;
+    z-index: 50;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="icon.svg" alt="Lector NFC">
+  <h1>Lector NFC</h1>
+  <p>Funciona sin conexión · Instalable como app</p>
+</header>
+
+<main>
+  <button id="btnScan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <path d="M6.5 8.5a5.5 5.5 0 0 1 0 7"/>
+      <path d="M10 10.2a2.6 2.6 0 0 1 0 3.6"/>
+      <path d="M3 6.5a9 9 0 0 1 0 11"/>
+      <path d="M14 12h7m0 0-3-3m3 3-3 3"/>
+    </svg>
+    Escanear etiqueta NFC
+  </button>
+  <div class="hint">Acerca la tarjeta, llavero o etiqueta NFC a la parte trasera del celular hasta que vibre.</div>
+  <div id="status"></div>
+
+  <div class="card" id="resultCard">
+    <h2>ID de la etiqueta</h2>
+    <div id="tagId"></div>
+    <div id="tagTime"></div>
+    <div id="tagContent"></div>
+    <div class="row-btns">
+      <button class="btn primary" id="btnCopyId">Copiar ID</button>
+      <button class="btn" id="btnCopyContent">Copiar contenido</button>
+    </div>
+  </div>
+
+  <div id="installWrap">
+    <button id="btnInstall">Instalar app en este dispositivo</button>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let lastId = '';
+let lastText = '';
+let deferredInstall = null;
+let activeScan = null;
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function setStatus(msg, cls) {
+  const s = $('#status');
+  s.textContent = msg;
+  s.className = cls || '';
+}
+
+function copy(text, label) {
+  if (!text) return toast('Nada que copiar todavía.');
+  navigator.clipboard.writeText(text)
+    .then(() => toast(label + ' copiado.'))
+    .catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast(label + ' copiado.');
+    });
+}
+$('#btnCopyId').addEventListener('click', () => copy(lastId, 'ID'));
+$('#btnCopyContent').addEventListener('click', () => copy(lastText, 'Contenido'));
+
+function decodeRecord(record) {
+  const data = new TextDecoder().decode(record.data);
+  if (record.recordType === 'url') return { type: 'Enlace', value: data };
+  if (record.recordType === 'text') return { type: 'Texto', value: data };
+  if (record.recordType === 'mime' && record.mediaType === 'text/plain') return { type: 'Texto', value: data };
+  return null;
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function showResult(serial, items) {
+  lastId = serial;
+  lastText = items.map((i) => i.value).join('\n');
+  $('#tagId').textContent = serial;
+  const now = new Date();
+  const fechaHora = now.toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) +
+    ' · ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  $('#tagTime').textContent = fechaHora;
+  $('#tagTime').style.marginTop = '8px';
+  $('#tagTime').style.color = 'var(--muted)';
+  $('#tagTime').style.fontSize = '.9rem';
+  $('#tagContent').innerHTML = items.length
+    ? '<h2>Contenido de la etiqueta</h2>' + items.map((i) =>
+        '<div class="content-item"><div class="ctype">' + i.type + '</div>' +
+        (i.type === 'Enlace' ? '<a href="' + i.value + '">' + i.value + '</a>' : i.value) +
+        '</div>').join('')
+    : '';
+  $('#resultCard').classList.add('show');
+}
+
+async function scan() {
+  if (!('NDEFReader' in window)) {
+    setStatus('Este navegador no soporta NFC. Usa Chrome o Edge en Android.', 'err');
+    return;
+  }
+  if (activeScan) activeScan.abort();
+  activeScan = new AbortController();
+  const ndef = new NDEFReader();
+  try {
+    setStatus('Esperando etiqueta… acerca el celular a la tarjeta.', 'wait');
+    $('#btnScan').disabled = true;
+    await ndef.scan({ signal: activeScan.signal });
+    ndef.addEventListener('reading', ({ serialNumber, message }) => {
+      const items = [];
+      for (const record of message.records) {
+        const decoded = decodeRecord(record);
+        if (decoded) items.push(decoded);
+      }
+      showResult(serialNumber, items);
+      setStatus('Lectura correcta.', 'ok');
+      if (navigator.vibrate) navigator.vibrate(150);
+    }, { once: true, signal: activeScan.signal });
+    ndef.addEventListener('readingerror', () => setStatus('Error al leer. Vuelve a acercar la etiqueta.', 'err'), { once: true, signal: activeScan.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    if (e.name === 'NotAllowedError') setStatus('Permiso denegado: autoriza el uso de NFC en el navegador.', 'err');
+    else setStatus('No se pudo iniciar el escáner: ' + (e.message || e.name), 'err');
+  } finally {
+    $('#btnScan').disabled = false;
+  }
+}
+$('#btnScan').addEventListener('click', scan);
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  $('#installWrap').style.display = 'block';
+});
+$('#btnInstall').addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice;
+  deferredInstall = null;
+  $('#installWrap').style.display = 'none';
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

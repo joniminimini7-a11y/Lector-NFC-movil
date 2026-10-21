@@ -1,0 +1,15 @@
+{
+  "name": "Lector NFC",
+  "short_name": "Lector NFC",
+  "description": "Lee etiquetas NFC sin conexion. Instalable por enlace.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
